@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ServiceManagement
 
 struct SettingsView: View {
@@ -57,6 +58,10 @@ struct SettingsView: View {
                     Text("En tradingview.com/widget elegí \"Ticker Tape\", cargá tus símbolos (con prefijo, p. ej. MATBAROFEX:…), copiá el código que te da y pegalo acá completo. Los datos son los que TradingView publica en sus widgets gratuitos: no usa tu cuenta ni tu suscripción, y algunos mercados pueden venir con demora.")
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
+                        Button("Pegar") {
+                            if let text = NSPasteboard.general.string(forType: .string) { embedText = text }
+                        }
+                        .help("Reemplaza el contenido por lo que copiaste")
                         Button("Restaurar ejemplo") { embedText = Settings.defaultTradingViewEmbed }
                         Spacer()
                         Button("Aplicar código") {

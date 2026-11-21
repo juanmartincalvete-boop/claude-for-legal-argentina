@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installEditMenu()
         panel = TickerPanel()
         tickerView = TickerView(frame: panel.contentLayoutRect)
         tickerView.autoresizingMask = [.width, .height]
@@ -41,6 +42,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Al despertar la Mac, reconectar enseguida.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                           object: nil, queue: .main) { [weak self] _ in self?.restartData() }
+    }
+
+    /// Las apps sin ícono en el Dock no tienen barra de menús propia, y sin un menú "Edición"
+    /// los atajos ⌘C / ⌘V / ⌘X / ⌘A / ⌘Z no funcionan en los campos de texto. Este menú aparece
+    /// en la barra sólo mientras la ventana de Configuración está al frente.
+    private func installEditMenu() {
+        let main = NSMenu()
+        // El primer ítem de la barra es siempre el menú de la app (lleva su nombre).
+        let appItem = NSMenuItem()
+        main.addItem(appItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Configuración…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+
+        let editItem = NSMenuItem()
+        main.addItem(editItem)
+        let edit = NSMenu(title: "Edición")
+        edit.addItem(withTitle: "Deshacer", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Rehacer", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copiar", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Pegar", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Seleccionar todo", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        NSApp.mainMenu = main
     }
 
     func applicationWillTerminate(_ notification: Notification) { store.stop() }
