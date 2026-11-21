@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = QuoteStore()
     private var panel: TickerPanel!
     private var tickerView: TickerView!
+    private var tvView: TradingViewView!
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
@@ -16,6 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         tickerView = TickerView(frame: panel.contentLayoutRect)
         tickerView.autoresizingMask = [.width, .height]
         panel.contentView = tickerView
+
+        tvView = TradingViewView(frame: panel.contentLayoutRect)
+        tvView.autoresizingMask = [.width, .height]
+        tvView.menuProvider = { [weak self] in self?.buildMenu() ?? NSMenu() }
 
         let menu = buildMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -28,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyAppearance()
         refreshText()
         panel.orderFrontRegardless()
-        restartData()
+        applySource()
         observeSettings()
 
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -61,10 +66,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.applyAppearance(); self?.refreshText() }
             .store(in: &cancellables)
+
+        Publishers.Merge3(settings.$source.map { _ in () },
+                          settings.$tradingViewEmbed.map { _ in () },
+                          settings.$tradingViewZoom.map { _ in () })
+            .dropFirst(3)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.applySource() }
+            .store(in: &cancellables)
+    }
+
+    /// Alterna entre la cinta propia y el widget de TradingView.
+    private func applySource() {
+        switch settings.source {
+        case .native:
+            if panel.contentView !== tickerView { panel.contentView = tickerView }
+            restartData()
+        case .tradingView:
+            store.stop()  // no hace falta consultar Yahoo/Finnhub mientras se muestra el widget
+            if panel.contentView !== tvView { panel.contentView = tvView }
+            tvView.show(embed: settings.tradingViewEmbed, backgroundAlpha: settings.opacity,
+                        zoom: settings.tradingViewZoom)
+        }
     }
 
     private func restartData() {
-        store.start(symbols: settings.symbols, finnhubKey: settings.finnhubKey, interval: settings.pollInterval)
+        switch settings.source {
+        case .native:
+            store.start(symbols: settings.symbols, finnhubKey: settings.finnhubKey, interval: settings.pollInterval)
+        case .tradingView:
+            tvView.reloadWidget()
+        }
     }
 
     private func applyAppearance() {
@@ -73,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.ignoresMouseEvents = settings.clickThrough
         tickerView.speed = CGFloat(settings.speed)
         tickerView.backgroundAlpha = CGFloat(settings.opacity)
+        tvView?.setBackgroundAlpha(settings.opacity)
     }
 
     private func refreshText() {
@@ -86,8 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildMenu() -> NSMenu {
         let m = NSMenu()
         m.addItem(withTitle: "Configuración…", action: #selector(openSettings), keyEquivalent: ",").target = self
-        m.addItem(withTitle: "Pausar desplazamiento", action: #selector(togglePause), keyEquivalent: "p").target = self
-        m.addItem(withTitle: "Ocultar ticker", action: #selector(toggleVisible), keyEquivalent: "h").target = self
+        if settings.source == .native {
+            m.addItem(withTitle: tickerView.userPaused ? "Reanudar desplazamiento" : "Pausar desplazamiento",
+                      action: #selector(togglePause), keyEquivalent: "p").target = self
+        }
+        m.addItem(withTitle: panel.isVisible ? "Ocultar ticker" : "Mostrar ticker",
+                  action: #selector(toggleVisible), keyEquivalent: "h").target = self
         m.addItem(withTitle: "Actualizar ahora", action: #selector(refreshNow), keyEquivalent: "r").target = self
         m.addItem(.separator())
         m.addItem(withTitle: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -122,14 +159,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSMenuDelegate {
-    // Actualiza los títulos dinámicos cada vez que se abre un menú.
+    // Rearma el menú cada vez que se abre, para que refleje el modo y el estado actuales.
     func menuNeedsUpdate(_ menu: NSMenu) {
-        for item in menu.items {
-            if item.action == #selector(togglePause) {
-                item.title = tickerView.userPaused ? "Reanudar desplazamiento" : "Pausar desplazamiento"
-            } else if item.action == #selector(toggleVisible) {
-                item.title = panel.isVisible ? "Ocultar ticker" : "Mostrar ticker"
-            }
+        let fresh = buildMenu()
+        menu.removeAllItems()
+        for item in fresh.items {
+            fresh.removeItem(item)
+            menu.addItem(item)
         }
     }
 }

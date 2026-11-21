@@ -7,6 +7,12 @@ enum TickerPosition: String, CaseIterable, Identifiable {
     var label: String { self == .top ? "Arriba (debajo de la barra de menú)" : "Abajo (encima del Dock)" }
 }
 
+enum TickerSource: String, CaseIterable, Identifiable {
+    case native, tradingView
+    var id: String { rawValue }
+    var label: String { self == .native ? "Propia (Yahoo + Finnhub)" : "Widget de TradingView" }
+}
+
 /// Preferencias persistidas en UserDefaults.
 final class Settings: ObservableObject {
     static let shared = Settings()
@@ -23,6 +29,18 @@ final class Settings: ObservableObject {
     @Published var pollInterval: Double { didSet { d.set(pollInterval, forKey: "pollInterval") } }
     /// Si está activo, los clics atraviesan el ticker y llegan a la ventana de abajo.
     @Published var clickThrough: Bool { didSet { d.set(clickThrough, forKey: "clickThrough") } }
+    /// Qué se muestra en la franja: la cinta propia o el widget oficial de TradingView.
+    @Published var source: TickerSource { didSet { d.set(source.rawValue, forKey: "source") } }
+    /// Código de inserción copiado tal cual desde tradingview.com/widget (Ticker Tape).
+    @Published var tradingViewEmbed: String { didSet { d.set(tradingViewEmbed, forKey: "tradingViewEmbed") } }
+    /// Escala del widget de TradingView dentro de la franja.
+    @Published var tradingViewZoom: Double { didSet { d.set(tradingViewZoom, forKey: "tradingViewZoom") } }
+
+    static let defaultTradingViewEmbed = """
+    <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script>
+
+    <tv-ticker-tape symbols="FOREXCOM:SPXUSD,FOREXCOM:NSXUSD,FOREXCOM:DJI,FX:EURUSD,BITSTAMP:BTCUSD,BITSTAMP:ETHUSD,CMCMARKETS:GOLD"></tv-ticker-tape>
+    """
 
     private init() {
         symbols = d.stringArray(forKey: "symbols").map { Settings.parseSymbols($0.joined(separator: ",")) }
@@ -34,6 +52,9 @@ final class Settings: ObservableObject {
         opacity = d.object(forKey: "opacity") as? Double ?? 0.88
         pollInterval = d.object(forKey: "pollInterval") as? Double ?? 15
         clickThrough = d.object(forKey: "clickThrough") as? Bool ?? false
+        source = TickerSource(rawValue: d.string(forKey: "source") ?? "") ?? .native
+        tradingViewEmbed = d.string(forKey: "tradingViewEmbed") ?? Settings.defaultTradingViewEmbed
+        tradingViewZoom = d.object(forKey: "tradingViewZoom") as? Double ?? 1.0
     }
 
     /// Convierte "aapl, msft  ggal.ba" en ["AAPL", "MSFT", "GGAL.BA"], sin duplicados.

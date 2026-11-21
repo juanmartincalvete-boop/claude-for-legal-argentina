@@ -75,6 +75,21 @@ Se usan los códigos de Yahoo Finance:
 La clave se guarda en las preferencias locales del usuario (`UserDefaults`), no se envía a
 ningún lado salvo a Finnhub.
 
+## Modo "Widget de TradingView"
+
+En **Configuración → Fuente de datos** podés elegir *Widget de TradingView*. En ese modo la
+franja muestra el widget oficial y gratuito **Ticker Tape** de TradingView, en lugar de la cinta propia:
+
+1. Entrá a https://tradingview.com/widget/ y elegí **Ticker Tape**.
+2. Cargá tus símbolos con el prefijo del mercado (por ejemplo `MATBAROFEX:...`, `BCBA:GGAL`).
+3. Copiá el código que te da la página y pegalo completo en **Código del widget de TradingView**.
+4. Clic en **Aplicar código**. Ajustá **Alto** y **Tamaño del widget** hasta que entre bien en la franja.
+
+El widget es el mismo que se inserta en cualquier página web: **no usa tu cuenta ni tu
+suscripción de TradingView**, y los datos (y su demora) son los que TradingView publica en sus
+widgets gratuitos. Al hacer clic en un símbolo se abre TradingView en el navegador. La app no
+extrae datos de TradingView: sólo muestra el widget.
+
 ## Estructura
 
 ```
@@ -88,6 +103,7 @@ Sources/StockTicker/
   FinnhubStream.swift   cliente WebSocket de Finnhub con reconexión
   Settings.swift        preferencias persistidas
   SettingsView.swift    pantalla de configuración (SwiftUI)
+  TradingViewView.swift muestra el widget Ticker Tape de TradingView
 build-app.sh            genera StockTicker.app firmada localmente
 ```
 

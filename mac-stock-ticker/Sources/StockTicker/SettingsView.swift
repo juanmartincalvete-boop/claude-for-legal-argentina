@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject var settings: Settings
     @State private var symbolsText: String
     @State private var keyText: String
+    @State private var embedText: String
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
@@ -12,47 +13,78 @@ struct SettingsView: View {
         self.settings = settings
         _symbolsText = State(initialValue: settings.symbols.joined(separator: ", "))
         _keyText = State(initialValue: settings.finnhubKey)
+        _embedText = State(initialValue: settings.tradingViewEmbed)
     }
 
     var body: some View {
         Form {
-            Section("Símbolos") {
-                TextField("AAPL, MSFT, GGAL.BA, ^MERV, BTC-USD", text: $symbolsText, axis: .vertical)
-                    .lineLimit(2...5)
-                Text("Separados por coma o espacio. Formato Yahoo Finance: acciones de BYMA con sufijo .BA (GGAL.BA, YPFD.BA), índices con ^ (^GSPC, ^MERV), cripto como BTC-USD.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
-            Section("Tiempo real (opcional)") {
-                SecureField("API key de Finnhub", text: $keyText)
-                Text("Con una clave gratuita de finnhub.io, las acciones de EE.UU. se actualizan operación por operación (● verde). Sin clave, se consulta Yahoo Finance cada pocos segundos.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
-            HStack {
-                Spacer()
-                Button("Aplicar símbolos y clave") {
-                    settings.symbols = Settings.parseSymbols(symbolsText)
-                    settings.finnhubKey = keyText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    symbolsText = settings.symbols.joined(separator: ", ")
+            Section("Fuente de datos") {
+                Picker("Mostrar", selection: $settings.source) {
+                    ForEach(TickerSource.allCases) { Text($0.label).tag($0) }
                 }
-                .keyboardShortcut(.defaultAction)
+                .pickerStyle(.radioGroup)
+            }
+
+            if settings.source == .native {
+                Section("Símbolos") {
+                    TextField("AAPL, MSFT, GGAL.BA, ^MERV, BTC-USD", text: $symbolsText, axis: .vertical)
+                        .lineLimit(2...5)
+                    Text("Separados por coma o espacio. Formato Yahoo Finance: acciones de BYMA con sufijo .BA (GGAL.BA, YPFD.BA), índices con ^ (^GSPC, ^MERV), cripto como BTC-USD.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                Section("Tiempo real (opcional)") {
+                    SecureField("API key de Finnhub", text: $keyText)
+                    Text("Con una clave gratuita de finnhub.io, las acciones de EE.UU. se actualizan operación por operación (● verde). Sin clave, se consulta Yahoo Finance cada pocos segundos.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Aplicar símbolos y clave") {
+                        settings.symbols = Settings.parseSymbols(symbolsText)
+                        settings.finnhubKey = keyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        symbolsText = settings.symbols.joined(separator: ", ")
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+
+            } else {
+                Section("Código del widget de TradingView") {
+                    TextEditor(text: $embedText)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 110)
+                    Text("En tradingview.com/widget elegí \"Ticker Tape\", cargá tus símbolos (con prefijo, p. ej. MATBAROFEX:…), copiá el código que te da y pegalo acá completo. Los datos son los que TradingView publica en sus widgets gratuitos: no usa tu cuenta ni tu suscripción, y algunos mercados pueden venir con demora.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Restaurar ejemplo") { embedText = Settings.defaultTradingViewEmbed }
+                        Spacer()
+                        Button("Aplicar código") {
+                            settings.tradingViewEmbed = embedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    }
+                    LabeledContent("Tamaño del widget") {
+                        Slider(value: $settings.tradingViewZoom, in: 0.5...1.5)
+                    }
+                }
             }
 
             Section("Apariencia") {
                 Picker("Posición", selection: $settings.position) {
                     ForEach(TickerPosition.allCases) { Text($0.label).tag($0) }
                 }
-                LabeledContent("Velocidad") { Slider(value: $settings.speed, in: 15...250) }
+                if settings.source == .native {
+                    LabeledContent("Velocidad") { Slider(value: $settings.speed, in: 15...250) }
+                }
                 LabeledContent("Alto") { Slider(value: $settings.height, in: 18...56, step: 1) }
                 LabeledContent("Opacidad del fondo") { Slider(value: $settings.opacity, in: 0.2...1) }
                 Toggle("Dejar pasar los clics a la ventana de abajo", isOn: $settings.clickThrough)
             }
 
-            Section("Datos") {
+            if settings.source == .native { Section("Datos") {
                 Stepper("Consultar Yahoo cada \(Int(settings.pollInterval)) s",
                         value: $settings.pollInterval, in: 5...300, step: 5)
-            }
+            } }
 
             Section("Sistema") {
                 Toggle("Abrir al iniciar sesión", isOn: $launchAtLogin)
