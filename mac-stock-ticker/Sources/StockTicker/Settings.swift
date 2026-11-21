@@ -25,7 +25,7 @@ final class Settings: ObservableObject {
     @Published var clickThrough: Bool { didSet { d.set(clickThrough, forKey: "clickThrough") } }
 
     private init() {
-        symbols = d.stringArray(forKey: "symbols")
+        symbols = d.stringArray(forKey: "symbols").map { Settings.parseSymbols($0.joined(separator: ",")) }
             ?? ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "GGAL", "YPF", "MELI", "^GSPC", "GGAL.BA", "^MERV"]
         finnhubKey = d.string(forKey: "finnhubKey") ?? ""
         position = TickerPosition(rawValue: d.string(forKey: "position") ?? "") ?? .bottom
@@ -39,7 +39,16 @@ final class Settings: ObservableObject {
     /// Convierte "aapl, msft  ggal.ba" en ["AAPL", "MSFT", "GGAL.BA"], sin duplicados.
     static func parseSymbols(_ text: String) -> [String] {
         var seen = Set<String>()
-        return text
+        // Los teclados en español de Mac suelen producir circunflejos "parecidos" (ˆ, ＾)
+        // que Yahoo no reconoce; los normalizamos al ^ común. También quitamos
+        // caracteres invisibles que pueden colarse al copiar y pegar.
+        let normalized = text
+            .replacingOccurrences(of: "\u{02C6}", with: "^")   // ˆ modificador
+            .replacingOccurrences(of: "\u{FF3E}", with: "^")   // ＾ ancho completo
+            .replacingOccurrences(of: "\u{0302}", with: "")    // circunflejo combinable suelto
+            .replacingOccurrences(of: "\u{200B}", with: "")    // espacio de ancho cero
+            .replacingOccurrences(of: "\u{FEFF}", with: "")
+        return normalized
             .split(whereSeparator: { $0 == "," || $0 == ";" || $0.isWhitespace })
             .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
             .filter { !$0.isEmpty && seen.insert($0).inserted }
