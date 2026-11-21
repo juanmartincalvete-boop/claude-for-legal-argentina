@@ -105,10 +105,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         if settingsWindow == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(settings: settings)))
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
+                             styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                             backing: .buffered, defer: false)
+            w.contentView = NSHostingView(rootView: SettingsView(settings: settings))
             w.title = "Stock Ticker — Configuración"
-            w.styleMask = [.titled, .closable]
+            w.contentMinSize = NSSize(width: 520, height: 560)
             w.isReleasedWhenClosed = false
+            w.setContentSize(NSSize(width: 560, height: 680))
             w.center()
             settingsWindow = w
         }

@@ -69,7 +69,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
-        .padding(.vertical, 8)
+        // El Form agrupado se desplaza y no tiene alto propio: sin un tamaño mínimo
+        // la ventana se abre colapsada y parece vacía.
+        .frame(minWidth: 520, idealWidth: 560, minHeight: 560, idealHeight: 680)
     }
 }
